@@ -1,9 +1,12 @@
-// src/pages/JoinQuiz.js
 import React, { useState, useContext } from "react";
-import { Input, Button, Card, message } from "antd";
+import { Input, Button, Card, message, Typography, Space } from "antd";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../config/AuthContext";
 import axios from "../utils/axios";
+import { motion } from "framer-motion";
+import { ArrowRightOutlined, TeamOutlined, LockOutlined } from "@ant-design/icons";
+
+const { Title, Text } = Typography;
 
 const JoinQuiz = () => {
   const [code, setCode] = useState("");
@@ -25,7 +28,6 @@ const JoinQuiz = () => {
 
     setLoading(true);
     try {
-      // First, check if the user is the creator
       const checkResponse = await axios.get(`/api/quiz/${code.trim()}`);
 
       if (!checkResponse.data) {
@@ -46,7 +48,6 @@ const JoinQuiz = () => {
         return;
       }
 
-      // If user is not the creator, proceed with join
       const requestData = {
         code: code.trim(),
         userId: auth.userId,
@@ -60,8 +61,6 @@ const JoinQuiz = () => {
 
       if (response.data.success) {
         message.success(response.data.message || "Successfully joined the quiz!");
-        
-        // Navigate to quiz room with updated state
         navigate(`/quiz/${code}`, { 
           state: { 
             isCreator: false,
@@ -77,13 +76,11 @@ const JoinQuiz = () => {
     } catch (err) {
       console.error("Join quiz error:", err);
       
-      // Handle different types of errors
       if (!err.response) {
         message.error("Network error. Please check your connection.");
         return;
       }
 
-      // Handle specific error cases
       if (err.response.status === 404) {
         message.error("Quiz not found. Please check the code.");
         return;
@@ -94,11 +91,9 @@ const JoinQuiz = () => {
         return;
       }
 
-      // Generic error handling
       const errorMessage = err.response?.data?.error || err.message || "Failed to join quiz";
       message.error(errorMessage);
       
-      // Log detailed error if available
       if (err.response?.data?.details) {
         console.error("Error details:", err.response.data.details);
       }
@@ -108,27 +103,62 @@ const JoinQuiz = () => {
   };
 
   return (
-    <div className="auth-container">
-      <Card title="Join Quiz" className="auth-card">
-        <Input
-          placeholder="Enter Quiz Code"
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          onPressEnter={handleJoin}
-          maxLength={6}
-          disabled={loading}
-        />
-        <Button 
-          type="primary" 
-          block 
-          onClick={handleJoin} 
-          loading={loading}
-          disabled={!code.trim()}
-          style={{ marginTop: "1rem" }}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
+      >
+        <Card
+          className="shadow-xl border-0 rounded-xl overflow-hidden"
+          cover={
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-center">
+              <TeamOutlined className="text-white text-4xl mb-3" />
+              <Title level={3} className="text-white m-0">Join a Quiz</Title>
+            </div>
+          }
         >
-          Join
-        </Button>
-      </Card>
+          <div className="p-6">
+            <Text className="block text-gray-600 mb-6 text-center">
+              Enter the quiz code provided by your host to join the game
+            </Text>
+
+            <Input
+              size="large"
+              placeholder="Enter 6-digit code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              onPressEnter={handleJoin}
+              maxLength={6}
+              disabled={loading}
+              prefix={<LockOutlined className="text-gray-400" />}
+              className="rounded-lg h-12 mb-6 text-center text-lg font-mono tracking-widest"
+            />
+
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                type="primary"
+                size="large"
+                block
+                onClick={handleJoin}
+                loading={loading}
+                disabled={!code.trim()}
+                className="h-12 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-none shadow-md"
+                icon={<ArrowRightOutlined />}
+              >
+                {loading ? 'Joining...' : 'Join Quiz'}
+              </Button>
+            </motion.div>
+
+            <div className="mt-6 text-center">
+              <Text type="secondary">
+                Don't have a code? Ask your host to share one with you
+              </Text>
+            </div>
+          </div>
+        </Card>
+      </motion.div>
     </div>
   );
 };

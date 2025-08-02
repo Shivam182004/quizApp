@@ -1,9 +1,10 @@
 import React, { useState, useContext } from "react";
-import { Form, Input, Select, Button, Card, message, Space, Modal } from "antd";
+import { Form, Input, Select, Button, Card, message, Space, Modal, Tag } from "antd";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../config/AuthContext";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, CloseOutlined, CheckOutlined } from "@ant-design/icons";
+import { motion } from "framer-motion";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -15,7 +16,7 @@ const CreateQuiz = () => {
   const [questions, setQuestions] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [questionForm] = Form.useForm();
-  const [form] = Form.useForm(); // Add main form instance
+  const [form] = Form.useForm();
 
   const handleCreate = async (values) => {
     if (questions.length === 0) {
@@ -30,7 +31,6 @@ const CreateQuiz = () => {
 
     setLoading(true);
     try {
-      // Generate a unique creator ID
       const creatorId = `creator_${Date.now()}_${Math.random()
         .toString(36)
         .substr(2, 9)}`;
@@ -84,18 +84,14 @@ const CreateQuiz = () => {
 
   const handleQuestionSubmit = () => {
     questionForm.validateFields().then((values) => {
-      // Validate options for choice-based questions
       if (
         values.type !== "text" &&
         (!values.options || values.options.length < 2)
       ) {
-        message.error(
-          "Please add at least 2 options for choice-based questions"
-        );
+        message.error("Please add at least 2 options for choice-based questions");
         return;
       }
 
-      // Validate correct answer for choice-based questions
       if (
         values.type !== "text" &&
         values.options &&
@@ -126,7 +122,6 @@ const CreateQuiz = () => {
     setQuestions((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Initialize form with 2 default options when selecting choice-based questions
   const handleQuestionTypeChange = (type) => {
     questionForm.setFieldsValue({
       options: type === "text" ? [] : ["", ""],
@@ -134,116 +129,195 @@ const CreateQuiz = () => {
     });
   };
 
+  const questionTypeColors = {
+    single: "blue",
+    mcq: "purple",
+    text: "green"
+  };
+
   return (
-    <div className="">
-      <div className="auth-container">
-        <Card title="Create New Quiz" className="auth-card">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8 px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-4xl mx-auto"
+      >
+        <Card
+          title={
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold text-blue-800">Create New Quiz</h1>
+            </div>
+          }
+          className="shadow-lg border-0 rounded-xl overflow-hidden"
+          headStyle={{ borderBottom: '1px solid #e8e8e8' }}
+        >
           <Form
             form={form}
             layout="vertical"
             onFinish={handleCreate}
-            initialValues={{
-              category: "technology", // Set default category
-            }}
+            initialValues={{ category: "technology" }}
           >
-            <Form.Item
-              name="title"
-              label="Quiz Title"
-              rules={[{ required: true, message: "Please enter quiz title" }]}
-            >
-              <Input placeholder="Enter quiz title" />
-            </Form.Item>
-
-            <Form.Item
-              name="category"
-              label="Category"
-              rules={[{ required: true, message: "Please select a category" }]}
-            >
-              <Select>
-                <Option value="technology">Technology</Option>
-                <Option value="science">Science</Option>
-                <Option value="college">College Subjects</Option>
-              </Select>
-            </Form.Item>
-
-            <div style={{ marginBottom: 16 }}>
-              <h3>Questions ({questions.length})</h3>
-              {questions.map((q, index) => (
-                <Card
-                  key={index}
-                  size="small"
-                  style={{ marginBottom: 8 }}
-                  extra={
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => removeQuestion(index)}
-                    />
-                  }
-                >
-                  <p>
-                    <strong>Question {index + 1}:</strong> {q.text}
-                  </p>
-                  <p>
-                    <strong>Type:</strong> {q.type}
-                  </p>
-                  {q.options.length > 0 && (
-                    <p>
-                      <strong>Options:</strong> {q.options.join(", ")}
-                    </p>
-                  )}
-                  <p>
-                    <strong>Correct Answer:</strong> {q.correctAnswer}
-                  </p>
-                </Card>
-              ))}
-              <Button
-                type="dashed"
-                onClick={showQuestionModal}
-                block
-                icon={<PlusOutlined />}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <Form.Item
+                name="title"
+                label={<span className="text-gray-700 font-medium">Quiz Title</span>}
+                rules={[{ required: true, message: "Please enter quiz title" }]}
               >
-                Add Question
-              </Button>
+                <Input 
+                  placeholder="Enter quiz title" 
+                  className="h-12 rounded-lg border-gray-300 hover:border-blue-400 focus:border-blue-500"
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="category"
+                label={<span className="text-gray-700 font-medium">Category</span>}
+                rules={[{ required: true, message: "Please select a category" }]}
+              >
+                <Select className="h-12 rounded-lg">
+                  <Option value="technology">Technology</Option>
+                  <Option value="science">Science</Option>
+                  <Option value="college">College Subjects</Option>
+                  <Option value="history">History</Option>
+                  <Option value="general">General Knowledge</Option>
+                </Select>
+              </Form.Item>
             </div>
 
-            <Button
-              type="primary"
-              htmlType="submit"
-              block
-              loading={loading}
-              disabled={questions.length === 0}
-            >
-              Create Quiz
-            </Button>
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Questions ({questions.length})</h3>
+                <Button
+                  type="primary"
+                  onClick={showQuestionModal}
+                  icon={<PlusOutlined />}
+                  className="flex items-center bg-blue-600 hover:bg-blue-700 border-none"
+                >
+                  Add Question
+                </Button>
+              </div>
+
+              {questions.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                  <p className="text-gray-500">No questions added yet</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {questions.map((q, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Card
+                        size="small"
+                        className="border-0 shadow-sm hover:shadow-md transition-shadow"
+                        extra={
+                          <Button
+                            type="text"
+                            danger
+                            icon={<CloseOutlined />}
+                            onClick={() => removeQuestion(index)}
+                            className="text-red-500 hover:text-red-700"
+                          />
+                        }
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="bg-blue-100 text-blue-800 rounded-full w-8 h-8 flex items-center justify-center font-medium">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="font-medium text-gray-800">{q.text}</h4>
+                              <Tag color={questionTypeColors[q.type]} className="capitalize">
+                                {q.type}
+                              </Tag>
+                            </div>
+                            
+                            {q.options.length > 0 && (
+                              <div className="mt-2">
+                                <h5 className="text-sm font-medium text-gray-600 mb-1">Options:</h5>
+                                <div className="flex flex-wrap gap-2">
+                                  {q.options.map((opt, i) => (
+                                    <Tag 
+                                      key={i} 
+                                      color={opt === q.correctAnswer ? "green" : "default"}
+                                      icon={opt === q.correctAnswer ? <CheckOutlined /> : null}
+                                      className="flex items-center gap-1"
+                                    >
+                                      {opt}
+                                    </Tag>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                disabled={questions.length === 0}
+                className="h-12 px-8 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-none shadow-md"
+              >
+                {loading ? 'Creating...' : 'Create Quiz'}
+              </Button>
+            </div>
           </Form>
 
           <Modal
-            title="Add Question"
+            title={<span className="text-xl font-semibold text-gray-800">Add Question</span>}
             open={isModalVisible}
             onOk={handleQuestionSubmit}
             onCancel={() => setIsModalVisible(false)}
-            width={600}
+            width={700}
+            footer={[
+              <Button key="back" onClick={() => setIsModalVisible(false)}>
+                Cancel
+              </Button>,
+              <Button 
+                key="submit" 
+                type="primary" 
+                onClick={handleQuestionSubmit}
+                className="bg-blue-600 hover:bg-blue-700 border-none"
+              >
+                Add Question
+              </Button>,
+            ]}
           >
-            <Form form={questionForm} layout="vertical">
+            <Form form={questionForm} layout="vertical" className="pt-4">
               <Form.Item
                 name="questionText"
-                label="Question Text"
-                rules={[
-                  { required: true, message: "Please enter the question" },
-                ]}
+                label={<span className="text-gray-700 font-medium">Question Text</span>}
+                rules={[{ required: true, message: "Please enter the question" }]}
               >
-                <TextArea rows={3} placeholder="Enter your question here" />
+                <TextArea 
+                  rows={3} 
+                  placeholder="Enter your question here" 
+                  className="rounded-lg border-gray-300 hover:border-blue-400 focus:border-blue-500"
+                />
               </Form.Item>
 
               <Form.Item
                 name="type"
-                label="Question Type"
+                label={<span className="text-gray-700 font-medium">Question Type</span>}
                 rules={[{ required: true }]}
                 initialValue="single"
               >
-                <Select onChange={handleQuestionTypeChange}>
+                <Select 
+                  onChange={handleQuestionTypeChange}
+                  className="rounded-lg h-10"
+                >
                   <Option value="single">Single Choice</Option>
                   <Option value="mcq">Multiple Choice</Option>
                   <Option value="text">Text Answer</Option>
@@ -262,7 +336,7 @@ const CreateQuiz = () => {
                     return (
                       <Form.Item
                         name="correctAnswer"
-                        label="Correct Answer"
+                        label={<span className="text-gray-700 font-medium">Correct Answer</span>}
                         rules={[
                           {
                             required: true,
@@ -270,7 +344,10 @@ const CreateQuiz = () => {
                           },
                         ]}
                       >
-                        <Input placeholder="Enter the correct answer" />
+                        <Input 
+                          placeholder="Enter the correct answer" 
+                          className="rounded-lg border-gray-300 hover:border-blue-400 focus:border-blue-500"
+                        />
                       </Form.Item>
                     );
                   }
@@ -297,13 +374,12 @@ const CreateQuiz = () => {
                       >
                         {(fields, { add, remove }) => (
                           <>
-                            {fields.map((field, index) => (
-                              <Form.Item
-                                key={field.key}
-                                label={index === 0 ? "Options" : ""}
-                                required={false}
-                              >
-                                <Space>
+                            <div className="mb-2">
+                              <span className="text-gray-700 font-medium">Options</span>
+                            </div>
+                            <div className="space-y-3">
+                              {fields.map((field, index) => (
+                                <div key={field.key} className="flex items-center gap-2">
                                   <Form.Item
                                     name={field.name}
                                     validateTrigger={["onChange", "onBlur"]}
@@ -311,43 +387,45 @@ const CreateQuiz = () => {
                                       {
                                         required: true,
                                         whitespace: true,
-                                        message:
-                                          "Please input option's content or delete this field.",
+                                        message: "Please input option's content or delete this field.",
                                       },
                                     ]}
                                     noStyle
                                   >
                                     <Input
                                       placeholder={`Option ${index + 1}`}
-                                      style={{ width: "300px" }}
+                                      className="flex-1 rounded-lg border-gray-300 hover:border-blue-400 focus:border-blue-500"
                                     />
                                   </Form.Item>
                                   {fields.length > 2 && (
-                                    <DeleteOutlined
+                                    <Button
+                                      type="text"
+                                      danger
+                                      icon={<CloseOutlined />}
                                       onClick={() => remove(field.name)}
+                                      className="text-red-500 hover:text-red-700"
                                     />
                                   )}
-                                </Space>
-                              </Form.Item>
-                            ))}
-                            {fields.length < 6 && (
-                              <Form.Item>
+                                </div>
+                              ))}
+                              {fields.length < 6 && (
                                 <Button
                                   type="dashed"
                                   onClick={() => add()}
                                   icon={<PlusOutlined />}
                                   block
+                                  className="rounded-lg border-gray-300 hover:border-blue-400"
                                 >
                                   Add Option
                                 </Button>
-                              </Form.Item>
-                            )}
+                              )}
+                            </div>
                           </>
                         )}
                       </Form.List>
                       <Form.Item
                         name="correctAnswer"
-                        label="Correct Answer"
+                        label={<span className="text-gray-700 font-medium">Correct Answer</span>}
                         rules={[
                           {
                             required: true,
@@ -355,7 +433,10 @@ const CreateQuiz = () => {
                           },
                         ]}
                       >
-                        <Input placeholder="Enter the correct option exactly as written above" />
+                        <Input 
+                          placeholder="Enter the correct option exactly as written above" 
+                          className="rounded-lg border-gray-300 hover:border-blue-400 focus:border-blue-500"
+                        />
                       </Form.Item>
                     </>
                   );
@@ -364,7 +445,7 @@ const CreateQuiz = () => {
             </Form>
           </Modal>
         </Card>
-      </div>
+      </motion.div>
     </div>
   );
 };

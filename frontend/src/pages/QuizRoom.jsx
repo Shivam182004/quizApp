@@ -1,31 +1,14 @@
 import React, { useEffect, useState, useContext, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  Button,
-  Card,
-  Radio,
-  Checkbox,
-  Input,
-  Progress,
-  Space,
-  Alert,
-  Avatar,
-  List,
-  Result,
-  message,
-  Spin,
-  Typography,
-  Row,
-  Col,
-  Tag,
-} from "antd";
+import { Button, Card, Radio, Checkbox, Input, Progress, Space, Alert, Avatar, List, Result, message, Spin, Typography, Row, Col, Tag, Divider } from "antd";
 import { AuthContext } from "../config/AuthContext";
 import socket from "../socket";
 import axios from "../utils/axios";
-import { PlayCircleOutlined } from "@ant-design/icons";
-import Leaderboard from "./Leaderboard"; // Import the Leaderboard component
+import { PlayCircleOutlined, CrownOutlined, TeamOutlined, ClockCircleOutlined, CheckOutlined, ArrowRightOutlined } from "@ant-design/icons";
+import { motion } from "framer-motion";
+import Leaderboard from "./Leaderboard";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 const QuizRoom = () => {
   const { code } = useParams();
@@ -63,23 +46,14 @@ const QuizRoom = () => {
 
       const isCreatorStatus = quizData.creatorName === auth.username;
 
-      console.log("=== Quiz Data Debug ===");
-      console.log("Quiz Data:", quizData);
-      console.log("Current username:", auth.username);
-      console.log("Quiz creatorName:", quizData.creatorName);
-      console.log("Is creator?", isCreatorStatus);
-
       setQuiz(quizData);
       setQuestions(quizData.questions || []);
       setQuizStarted(quizData.status === "active");
       setIsCreator(isCreatorStatus);
 
-      // If user is creator and quiz has started, show leaderboard view
       if (isCreatorStatus && quizData.status === "active") {
         setShowCreatorLeaderboard(true);
       }
-
-      console.log("Creator status set to:", isCreatorStatus);
 
       if (quizData.participants) {
         setPlayers(quizData.participants);
@@ -120,13 +94,9 @@ const QuizRoom = () => {
     });
 
     socket.on("quiz-ended", (data) => {
-      console.log("Quiz ended event received", data);
-
-      // Update local state
       setQuizEnded(true);
       setQuiz((prev) => (prev ? { ...prev, status: "completed" } : prev));
 
-      // Store final scores for the leaderboard
       if (data.finalScores) {
         localStorage.setItem(
           `quiz_${code}_final_scores`,
@@ -134,12 +104,9 @@ const QuizRoom = () => {
         );
       }
 
-      // Store the quiz code for the leaderboard
       localStorage.setItem(`quiz_${code}_code`, code);
 
       message.info("Quiz has ended. Redirecting to leaderboard...");
-
-      // Redirect to leaderboard
       setTimeout(() => {
         navigate(`/leaderboard/${code}`);
       }, 1500);
@@ -174,15 +141,12 @@ const QuizRoom = () => {
     });
 
     socket.on("quiz-started", (data) => {
-      console.log("Quiz started event received", data);
       setQuizStarted(true);
 
-      // If questions are provided in the event, use them
       if (data.questions) {
         setQuestions(data.questions);
         setQuestionIndex(0);
 
-        // Set the time limit for the first question
         const firstQuestionTimeLimit = data.questions[0]?.timeLimit || 30;
         setTimeLeft(firstQuestionTimeLimit);
         setMaxTime(firstQuestionTimeLimit);
@@ -193,9 +157,6 @@ const QuizRoom = () => {
     });
 
     socket.on("next-question", (data) => {
-      console.log("Next question received", data);
-
-      // Clear any existing timer
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -206,7 +167,6 @@ const QuizRoom = () => {
         setAnswer("");
         setSubmitted(false);
 
-        // Set the time limit for this question
         const questionTimeLimit = data.question.timeLimit || 30;
         setTimeLeft(questionTimeLimit);
         setMaxTime(questionTimeLimit);
@@ -214,7 +174,6 @@ const QuizRoom = () => {
     });
 
     socket.on("answer-result", (data) => {
-      console.log("Answer result received", data);
       setScore(data.score);
 
       if (data.correct) {
@@ -235,7 +194,6 @@ const QuizRoom = () => {
         userId: auth.userId,
       });
 
-      // Clean up socket listeners
       socket.off("player-joined");
       socket.off("player-left");
       socket.off("player-list");
@@ -246,7 +204,6 @@ const QuizRoom = () => {
       socket.off("answer-result");
       socket.off("player-submitted");
 
-      // Clear timer interval when component unmounts
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -255,39 +212,32 @@ const QuizRoom = () => {
   }, [code, auth.username, auth.userId, navigate]);
 
   const handleStart = async () => {
-    // Check if current user is the creator
     if (!isCreator || quiz.creatorName !== auth.username) {
       message.error("Only the quiz creator can start the quiz");
       return;
     }
 
     try {
-      // First make the API call to start the quiz
       const response = await axios.post(`/api/quiz/start`, {
         code,
         creatorName: auth.username,
       });
 
       if (response.data.success) {
-        // After successful API call, emit socket event to notify other players
         socket.emit("start-quiz", {
           code,
-          userId: auth.userId, // Send userId for creator verification
+          userId: auth.userId,
         });
 
-        // Update local state
         setQuizStarted(true);
         setQuestions(response.data.questions);
 
-        // Set the first question's time limit
         const firstQuestionTimeLimit =
           response.data.questions[0]?.timeLimit || 30;
         setTimeLeft(firstQuestionTimeLimit);
         setMaxTime(firstQuestionTimeLimit);
 
-        // Show leaderboard for creator
         setShowCreatorLeaderboard(true);
-
         message.success("Quiz started successfully!");
       }
     } catch (error) {
@@ -297,26 +247,19 @@ const QuizRoom = () => {
   };
 
   useEffect(() => {
-    // Only start timer when quiz is active and not ended
     if (quizStarted && !quizEnded) {
-      console.log("Starting timer with", timeLeft, "seconds");
-
-      // Clear any existing timer
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
 
-      // Create new interval for countdown
       timerRef.current = setInterval(() => {
         setTimeLeft((prevTime) => {
           const newTime = prevTime - 1;
 
-          // When time reaches 0, clear interval and handle time expiration
           if (newTime <= 0) {
             clearInterval(timerRef.current);
             timerRef.current = null;
 
-            // Only the host should advance the question
             if (isCreator) {
               handleQuestionTimeout();
             }
@@ -326,9 +269,7 @@ const QuizRoom = () => {
         });
       }, 1000);
 
-      // Cleanup function
       return () => {
-        console.log("Clearing timer interval");
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
@@ -347,7 +288,6 @@ const QuizRoom = () => {
     setSubmitted(true);
 
     try {
-      // Use socket to submit answer
       socket.emit("submit-answer", {
         code,
         questionIndex,
@@ -356,7 +296,6 @@ const QuizRoom = () => {
         userId: auth.userId,
       });
 
-      // For fallback, also make the API call
       const response = await axios.post(`/api/quiz/submit-answer`, {
         code,
         userId: auth.userId,
@@ -365,7 +304,6 @@ const QuizRoom = () => {
       });
 
       if (response.data.success) {
-        // Update the score with the currentScore from backend
         setScore(response.data.currentScore);
 
         if (response.data.correct) {
@@ -377,8 +315,6 @@ const QuizRoom = () => {
             `Incorrect. The correct answer was: ${response.data.correctAnswer}`
           );
         }
-
-        // Don't move to next question here - wait for timer to finish
       }
     } catch (error) {
       console.error("Failed to submit answer:", error);
@@ -395,28 +331,23 @@ const QuizRoom = () => {
     }
 
     try {
-      console.log("Attempting to end quiz with code:", code);
-
-      // First make the API call to end the quiz
       const response = await axios.post(`/api/quiz/${code}/end`, {
         code,
-        createdBy: quiz.createdBy, // Using the quiz's createdBy ID for authorization
-        userId: auth.userId, // Only used to mark current user in leaderboard
+        createdBy: quiz.createdBy,
+        userId: auth.userId,
       });
 
       if (response.data.success) {
-        // After successful API call, emit socket event to notify all players
         socket.emit("end-quiz", {
           code,
           createdBy: quiz.createdBy,
           userId: auth.userId,
-          finalScores: response.data.leaderboard, // Pass the leaderboard data
+          finalScores: response.data.leaderboard,
         });
 
         setQuizEnded(true);
         message.success("Quiz ended successfully");
 
-        // Navigate to leaderboard
         setTimeout(() => {
           navigate(`/leaderboard/${code}`);
         }, 1000);
@@ -424,7 +355,6 @@ const QuizRoom = () => {
     } catch (error) {
       console.error("Failed to end quiz:", error);
 
-      // Handle specific error cases
       if (error.response?.status === 403) {
         message.error("Only quiz creator can end the quiz");
       } else if (error.response?.status === 400) {
@@ -437,59 +367,173 @@ const QuizRoom = () => {
     }
   };
 
-  const currentQuestion = questions[questionIndex] || {};
-
-  // Add this function to handle question timeout
   const handleQuestionTimeout = async () => {
-    // Check if we're at the last question
     if (questionIndex >= questions.length - 1) {
-      // If this is the last question, end the quiz
-      console.log("Last question completed, ending quiz");
       await handleEndQuiz();
     } else {
-      // Move to the next question
       const nextIndex = questionIndex + 1;
 
-      // Emit socket event to move all players to next question
       socket.emit("move-to-next-question", {
         code,
         questionNumber: nextIndex + 1,
         question: questions[nextIndex],
       });
 
-      // Update local state
       setQuestionIndex(nextIndex);
       setAnswer("");
       setSubmitted(false);
 
-      // Set the time limit for the next question
       const nextQuestionTimeLimit = questions[nextIndex]?.timeLimit || 30;
       setTimeLeft(nextQuestionTimeLimit);
       setMaxTime(nextQuestionTimeLimit);
     }
   };
 
-  // If loading, show loading state
+  const currentQuestion = questions[questionIndex] || {};
+
+  const renderQuestionOptions = () => {
+    if (currentQuestion.type === "single") {
+      return (
+        <Radio.Group
+          onChange={(e) => setAnswer(e.target.value)}
+          value={answer}
+          disabled={submitted}
+          className="w-full"
+        >
+          <Space direction="vertical" className="w-full">
+            {currentQuestion.options?.map((opt, idx) => (
+              <motion.div 
+                key={idx}
+                whileHover={{ scale: 1.02 }}
+                className="w-full"
+              >
+                <Radio value={opt} className="w-full">
+                  <Card
+                    hoverable={!submitted}
+                    className={`w-full mb-4 transition-all duration-200 ${
+                      answer === opt 
+                        ? 'border-blue-500 bg-blue-50 shadow-md' 
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <Text className="text-lg">{opt}</Text>
+                  </Card>
+                </Radio>
+              </motion.div>
+            ))}
+          </Space>
+        </Radio.Group>
+      );
+    }
+
+    if (currentQuestion.type === "multiple") {
+      return (
+        <Checkbox.Group
+          onChange={setAnswer}
+          value={answer}
+          disabled={submitted}
+          className="w-full"
+        >
+          <Space direction="vertical" className="w-full">
+            {currentQuestion.options?.map((opt, idx) => (
+              <motion.div 
+                key={idx}
+                whileHover={{ scale: 1.02 }}
+                className="w-full"
+              >
+                <Checkbox value={opt} className="w-full">
+                  <Card
+                    hoverable={!submitted}
+                    className={`w-full mb-4 transition-all duration-200 ${
+                      answer?.includes(opt)
+                        ? 'border-blue-500 bg-blue-50 shadow-md' 
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <Text className="text-lg">{opt}</Text>
+                  </Card>
+                </Checkbox>
+              </motion.div>
+            ))}
+          </Space>
+        </Checkbox.Group>
+      );
+    }
+
+    return (
+      <Input.TextArea
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        disabled={submitted}
+        rows={4}
+        className="w-full rounded-lg"
+        placeholder="Type your answer here..."
+      />
+    );
+  };
+
+  const renderCreatorControls = () => {
+    if (!isCreator || quiz.creatorName !== auth.username) {
+      return null;
+    }
+
+    return (
+      <Card className="bg-blue-50 border-blue-200 mb-6">
+        <Title level={5} className="mb-4">
+          <CrownOutlined /> Host Controls
+        </Title>
+        {players.length < 2 ? (
+          <Alert
+            message="Waiting for Players"
+            description="You need at least 2 players to start the quiz"
+            type="warning"
+            showIcon
+            className="mb-4"
+          />
+        ) : (
+          <Alert
+            message="Ready to Start"
+            description={`${players.length} players are waiting`}
+            type="success"
+            showIcon
+            className="mb-4"
+          />
+        )}
+        <motion.div whileHover={{ scale: 1.02 }}>
+          <Button
+            type="primary"
+            size="large"
+            block
+            onClick={handleStart}
+            disabled={players.length < 2}
+            className="h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-none"
+            icon={<PlayCircleOutlined />}
+          >
+            {players.length < 2 ? 'Waiting for Players...' : 'Start Quiz Now'}
+          </Button>
+        </motion.div>
+      </Card>
+    );
+  };
+
   if (loading) {
     return (
-      <div className="quiz-container">
-        <Card className="quiz-card">
-          <div style={{ textAlign: "center", padding: "40px" }}>
-            <Spin size="large" />
-            <Title level={4} style={{ marginTop: "20px" }}>
-              Loading Quiz...
-            </Title>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+        <Card className="w-full max-w-2xl shadow-xl border-0 rounded-xl">
+          <div className="text-center py-12">
+            <Spin size="large" className="mb-4" />
+            <Title level={3} className="text-gray-700">Loading Quiz...</Title>
+            <Text type="secondary">Preparing your quiz experience</Text>
           </div>
         </Card>
       </div>
     );
   }
 
-  // If error, show error state
   if (error) {
     return (
-      <div className="quiz-container">
-        <Card className="quiz-card">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+        <Card className="w-full max-w-2xl shadow-xl border-0 rounded-xl">
           <Result
             status="error"
             title="Failed to load quiz"
@@ -499,8 +543,9 @@ const QuizRoom = () => {
                 type="primary"
                 key="home"
                 onClick={() => navigate("/home")}
+                className="bg-blue-600 hover:bg-blue-700 border-none"
               >
-                Back Home
+                Back to Home
               </Button>,
             ]}
           />
@@ -509,11 +554,10 @@ const QuizRoom = () => {
     );
   }
 
-  // If quiz not found
   if (!quiz) {
     return (
-      <div className="quiz-container">
-        <Card className="quiz-card">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+        <Card className="w-full max-w-2xl shadow-xl border-0 rounded-xl">
           <Result
             status="404"
             title="Quiz Not Found"
@@ -523,8 +567,9 @@ const QuizRoom = () => {
                 type="primary"
                 key="home"
                 onClick={() => navigate("/home")}
+                className="bg-blue-600 hover:bg-blue-700 border-none"
               >
-                Back Home
+                Back to Home
               </Button>,
             ]}
           />
@@ -533,322 +578,248 @@ const QuizRoom = () => {
     );
   }
 
-  // If creator and quiz has started, show leaderboard
   if (isCreator && quizStarted && showCreatorLeaderboard) {
     return (
-      <div className="quiz-container">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
         <Card
-          className="quiz-card"
+          className="w-full max-w-6xl mx-auto shadow-xl border-0 rounded-xl"
           title={
-            <Space
-              align="center"
-              style={{ width: "100%", justifyContent: "space-between" }}
-            >
-              <Title level={3}>{quiz.title} - Host View</Title>
-              {/* End Quiz button removed */}
-            </Space>
+            <div className="flex items-center justify-between">
+              <Title level={3} className="m-0">
+                {quiz.title} - <span className="text-blue-600">Host View</span>
+              </Title>
+              <Tag color="gold" className="text-lg">
+                <CrownOutlined /> Host
+              </Tag>
+            </div>
           }
         >
           {!quizEnded ? (
             <>
-              <div className="quiz-progress">
-                <Title level={4}>
-                  Question {questionIndex + 1} of {questions.length}
-                </Title>
-                <Progress
-                  percent={((questionIndex + 1) / questions.length) * 100}
-                  status="active"
-                  format={() => `${questionIndex + 1}/${questions.length}`}
-                />
-
-                <div className="timer-section">
-                  <Progress
-                    percent={(timeLeft / maxTime) * 100}
-                    status={timeLeft < 5 ? "exception" : "active"}
-                    showInfo={false}
-                    strokeColor={
-                      timeLeft > maxTime * 0.5
-                        ? "#52c41a" // green for plenty of time
-                        : timeLeft > maxTime * 0.2
-                        ? "#faad14" // yellow for medium time
-                        : "#f5222d" // red for low time
-                    }
-                  />
-                  <div className="time-display">
-                    Time Left:{" "}
-                    <span className={timeLeft <= 5 ? "time-critical" : ""}>
-                      {timeLeft}s
-                    </span>
-                  </div>
-                </div>
-
-                <Card
-                  className="current-question-card"
-                  style={{ marginBottom: "20px" }}
-                >
-                  <Title level={5}>Current Question:</Title>
-                  <p>{currentQuestion.text}</p>
-                  <p>
-                    <strong>Correct Answer:</strong>{" "}
-                    {Array.isArray(currentQuestion.correctAnswer)
-                      ? currentQuestion.correctAnswer.join(", ")
-                      : currentQuestion.correctAnswer}
-                  </p>
-                </Card>
+              <div className="mb-8">
+                <Row gutter={16}>
+                  <Col span={24} md={8}>
+                    <Card className="mb-4">
+                      <Title level={5} className="text-center">
+                        Current Question
+                      </Title>
+                      <Divider />
+                      <Text className="text-lg">{questions[questionIndex]?.text}</Text>
+                    </Card>
+                  </Col>
+                  <Col span={24} md={16}>
+                    <Card>
+                      <div className="flex justify-between items-center mb-4">
+                        <Title level={5} className="m-0">
+                          Question {questionIndex + 1} of {questions.length}
+                        </Title>
+                        <div className="flex items-center">
+                          <ClockCircleOutlined className="mr-2 text-blue-500" />
+                          <Text strong className={timeLeft <= 5 ? 'text-red-500' : ''}>
+                            {timeLeft}s remaining
+                          </Text>
+                        </div>
+                      </div>
+                      <Progress
+                        percent={(timeLeft / maxTime) * 100}
+                        status={timeLeft < 5 ? "exception" : "active"}
+                        strokeColor={
+                          timeLeft > maxTime * 0.5
+                            ? "#52c41a"
+                            : timeLeft > maxTime * 0.2
+                            ? "#faad14"
+                            : "#f5222d"
+                        }
+                      />
+                    </Card>
+                  </Col>
+                </Row>
               </div>
 
-              {/* Use the Leaderboard component with live prop */}
               <Leaderboard code={code} live={true} isCreator={true} />
             </>
           ) : (
-            <div style={{ textAlign: "center", padding: "20px" }}>
-              <Result
-                status="success"
-                title="Quiz Completed!"
-                subTitle="Redirecting to the final leaderboard..."
-              />
-            </div>
+            <Result
+              status="success"
+              title="Quiz Completed!"
+              subTitle="Redirecting to the final leaderboard..."
+              extra={
+                <Button 
+                  type="primary" 
+                  onClick={() => navigate(`/leaderboard/${code}`)}
+                  className="bg-blue-600 hover:bg-blue-700 border-none"
+                >
+                  View Final Leaderboard
+                </Button>
+              }
+            />
           )}
         </Card>
       </div>
     );
   }
 
-  const renderCreatorControls = () => {
-    // Check if current user is the creator
-    if (!isCreator || quiz.creatorName !== auth.username) {
-      return null;
-    }
-
-    return (
-      <div style={{ marginTop: "20px" }}>
-        <Alert
-          message="Host Controls"
-          description={
-            players.length < 2
-              ? "Please wait for at least 2 players to join before starting the quiz."
-              : "You can now start the quiz. All players are ready!"
-          }
-          type={players.length < 2 ? "warning" : "success"}
-          showIcon
-          style={{ marginBottom: "20px" }}
-        />
-        <Button
-          type="primary"
-          size="large"
-          block
-          onClick={handleStart}
-          disabled={players.length < 2}
-          style={{
-            height: "50px",
-            fontSize: "18px",
-            backgroundColor: players.length < 2 ? "#d9d9d9" : "#1890ff",
-          }}
-          icon={<PlayCircleOutlined />}
-        >
-          {players.length < 2 ? "Waiting for Players..." : "Start Quiz Now"}
-        </Button>
-      </div>
-    );
-  };
-
   if (!quizStarted) {
     return (
-      <div className="quiz-container">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
         <Card
+          className="w-full max-w-4xl mx-auto shadow-xl border-0 rounded-xl"
           title={
-            <Space>
-              <Title level={3}>{quiz.title || "Quiz Lobby"}</Title>
-              <Tag color="blue">Code: {code}</Tag>
-              {auth.userId === quiz.createdBy && (
-                <Tag color="gold">You are the host</Tag>
-              )}
-            </Space>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+              <Title level={3} className="m-0">
+                {quiz.title || "Quiz Lobby"}
+              </Title>
+              <div className="mt-2 md:mt-0">
+                <Tag color="blue" className="text-lg">
+                  Code: {code}
+                </Tag>
+                {isCreator && (
+                  <Tag color="gold" className="text-lg">
+                    <CrownOutlined /> Host
+                  </Tag>
+                )}
+              </div>
+            </div>
           }
-          className="quiz-card"
-          extra={
-            <Space>
-              <Tag color="cyan">Created by: {quiz.creatorName}</Tag>
-              <Avatar.Group maxCount={2}>
+        >
+          <div className="mb-6">
+            <Card className="mb-6">
+              <Title level={5} className="mb-2">
+                <TeamOutlined /> Players in Lobby ({players.length})
+              </Title>
+              <Avatar.Group maxCount={5} size="large">
                 {players.map((player) => (
-                  <Avatar key={player.userId}>
+                  <Avatar 
+                    key={player.userId} 
+                    className={player.userId === auth.userId ? 'ring-2 ring-blue-500' : ''}
+                  >
                     {player.username?.[0]?.toUpperCase()}
                   </Avatar>
                 ))}
               </Avatar.Group>
-              <span>Players: {players.length}</span>
-            </Space>
-          }
-        >
-          <div className="quiz-lobby">
+            </Card>
+
             {renderCreatorControls()}
 
-            <div className="players-list">
-              <Title level={4}>Players in Lobby</Title>
-              <List
-                dataSource={players}
-                renderItem={(player) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      avatar={
-                        <Avatar
-                          style={{
-                            backgroundColor:
-                              player.userId === quiz.createdBy
-                                ? "#f56a00"
-                                : "#1890ff",
-                          }}
-                        >
-                          {player.username?.[0]?.toUpperCase()}
-                        </Avatar>
-                      }
-                      title={
-                        <Space>
-                          {player.username}
-                          {player.userId === auth.userId && (
-                            <Tag color="green">You</Tag>
-                          )}
-                          {player.userId === quiz.createdBy && (
-                            <Tag color="orange">Host</Tag>
-                          )}
-                        </Space>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-            </div>
-
-            {(!isCreator || auth.userId !== quiz.createdBy) && (
-              <Alert
-                message="Waiting for host to start the quiz..."
-                type="info"
-                showIcon
-              />
+            {!isCreator && (
+              <Card>
+                <Alert
+                  message="Waiting for Host"
+                  description="The quiz will start when the host begins the game"
+                  type="info"
+                  showIcon
+                />
+              </Card>
             )}
           </div>
         </Card>
-        <Button type="primary" key="home" onClick={() => navigate("/home")}>
-          Back to Home
-        </Button>
       </div>
     );
   }
 
   return (
-    <div className="quiz-container">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
       <Card
-        className="quiz-card"
+        className="w-full max-w-4xl mx-auto shadow-xl border-0 rounded-xl"
         title={
-          <Space
-            align="center"
-            style={{ width: "100%", justifyContent: "space-between" }}
-          >
-            <Title level={3}>{quiz.title}</Title>
-            {/* End Quiz button removed */}
-          </Space>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <Title level={3} className="m-0">
+              {quiz.title}
+            </Title>
+            <div className="mt-2 md:mt-0">
+              <Tag color="blue" className="text-lg">
+                Score: {score} pts
+              </Tag>
+            </div>
+          </div>
         }
       >
-        <div className="quiz-content">
-          {quizStarted && !quizEnded && (
-            <div className="timer-section">
+        {!quizEnded ? (
+          <>
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <Text strong>
+                  Question {questionIndex + 1} of {questions.length}
+                </Text>
+                <div className="flex items-center">
+                  <ClockCircleOutlined className="mr-2 text-blue-500" />
+                  <Text strong className={timeLeft <= 5 ? 'text-red-500' : ''}>
+                    {timeLeft}s remaining
+                  </Text>
+                </div>
+              </div>
               <Progress
                 percent={(timeLeft / maxTime) * 100}
                 status={timeLeft < 5 ? "exception" : "active"}
-                showInfo={false}
                 strokeColor={
                   timeLeft > maxTime * 0.5
-                    ? "#52c41a" // green for plenty of time
+                    ? "#52c41a"
                     : timeLeft > maxTime * 0.2
-                    ? "#faad14" // yellow for medium time
-                    : "#f5222d" // red for low time
+                    ? "#faad14"
+                    : "#f5222d"
                 }
               />
-              <div className="time-display">
-                Time Left:{" "}
-                <span className={timeLeft <= 5 ? "time-critical" : ""}>
-                  {timeLeft}s
-                </span>
-              </div>
             </div>
-          )}
 
-          <div className="question-card">
-            <div className="question-header">
-              <Title level={4}>
-                Question {questionIndex + 1} of {questions.length}
+            <Card className="mb-6">
+              <Title level={4} className="mb-4">
+                {questions[questionIndex]?.text}
               </Title>
-              <Title level={3}>{currentQuestion.text}</Title>
+              {renderQuestionOptions()}
+            </Card>
+
+            <div className="text-center">
+              {submitted ? (
+                <Alert
+                  message="Answer Submitted"
+                  description="Waiting for the next question..."
+                  type="success"
+                  showIcon
+                  className="mb-4"
+                />
+              ) : (
+                <motion.div whileHover={{ scale: 1.02 }}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    onClick={handleSubmit}
+                    disabled={
+                      !answer || (Array.isArray(answer) && answer.length === 0)
+                    }
+                    loading={loading}
+                    className="h-12 px-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-none"
+                    icon={<ArrowRightOutlined />}
+                  >
+                    Submit Answer
+                  </Button>
+                </motion.div>
+              )}
             </div>
-
-            {currentQuestion.type === "single" && (
-              <Radio.Group
-                onChange={(e) => setAnswer(e.target.value)}
-                value={answer}
-                disabled={submitted}
-                className="options-container"
-              >
-                {currentQuestion.options?.map((opt, idx) => (
-                  <Radio key={idx} value={opt}>
-                    <Card
-                      hoverable={!submitted}
-                      className={`option-card ${
-                        answer === opt ? "selected" : ""
-                      }`}
-                    >
-                      {opt}
-                    </Card>
-                  </Radio>
-                ))}
-              </Radio.Group>
-            )}
-
-            {currentQuestion.type === "multiple" && (
-              <Checkbox.Group
-                onChange={setAnswer}
-                value={answer}
-                disabled={submitted}
-                className="options-container"
-              >
-                {currentQuestion.options?.map((opt, idx) => (
-                  <Checkbox key={idx} value={opt}>
-                    <Card
-                      hoverable={!submitted}
-                      className={`option-card ${
-                        answer?.includes(opt) ? "selected" : ""
-                      }`}
-                    >
-                      {opt}
-                    </Card>
-                  </Checkbox>
-                ))}
-              </Checkbox.Group>
-            )}
-          </div>
-
-          <div className="submit-section">
-            {submitted ? (
-              <Alert
-                message="Answer Submitted"
-                description="Waiting for the timer to complete. The next question will appear automatically."
-                type="success"
-                showIcon
-              />
-            ) : (
+          </>
+        ) : (
+          <Result
+            status="success"
+            title="Quiz Completed!"
+            subTitle={`Your final score is ${score} points`}
+            extra={[
               <Button
                 type="primary"
-                size="large"
-                onClick={handleSubmit}
-                disabled={
-                  !answer || (Array.isArray(answer) && answer.length === 0)
-                }
-                loading={loading}
+                key="leaderboard"
+                onClick={() => navigate(`/leaderboard/${code}`)}
+                className="bg-blue-600 hover:bg-blue-700 border-none"
               >
-                Submit Answer
-              </Button>
-            )}
-          </div>
-        </div>
+                View Leaderboard
+              </Button>,
+              <Button
+                key="home"
+                onClick={() => navigate("/home")}
+                className="ml-2"
+              >
+                Back to Home
+              </Button>,
+            ]}
+          />
+        )}
       </Card>
     </div>
   );
